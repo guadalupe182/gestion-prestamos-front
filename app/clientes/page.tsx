@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { exportToExcel, parseExcelFile } from "@/lib/excel";
 import type { Cliente, CreateClienteRequest, TipoCliente } from "@/lib/types";
 
 export default function ClientesPage() {
@@ -10,6 +11,8 @@ export default function ClientesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
   const [form, setForm] = useState<CreateClienteRequest>({
     nombre: "",
     email: "",
@@ -37,6 +40,55 @@ export default function ClientesPage() {
   useEffect(() => {
     loadClientes();
   }, []);
+
+  const handleExport = () => {
+    const rows = clientes.map((cliente) => ({
+      id: cliente.id,
+      nombre: cliente.nombre,
+      email: cliente.email,
+      edad: cliente.edad,
+      tipoCliente: cliente.tipoCliente,
+    }));
+    exportToExcel(rows, "clientes.xlsx", "Clientes");
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const rows = await parseExcelFile(file);
+      setPreviewRows(rows);
+    } catch {
+      setError("No fue posible leer el archivo Excel.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    if (previewRows.length === 0) return;
+    setImporting(true);
+    setError(null);
+    try {
+      for (const row of previewRows) {
+        await apiFetch<Cliente>("/api/v1/clientes", {
+          method: "POST",
+          body: JSON.stringify({
+            nombre: String(row.nombre ?? row.Nombre ?? ""),
+            email: String(row.email ?? row.Email ?? ""),
+            edad: Number(row.edad ?? row.Edad ?? 18),
+            tipoCliente: String(row.tipoCliente ?? row.TipoCliente ?? "REGULAR"),
+          }),
+        });
+      }
+      setPreviewRows([]);
+      await loadClientes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al importar clientes");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,13 +122,31 @@ export default function ClientesPage() {
             Gestión de clientes registrados en el sistema.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
-        >
-          + Nuevo Cliente
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            + Nuevo Cliente
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Exportar a Excel
+          </button>
+          <label className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50">
+            Importar Excel
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+          </label>
+        </div>
       </div>
 
       {error ? (
@@ -84,6 +154,57 @@ export default function ClientesPage() {
           {error}
         </div>
       ) : null}
+
+      {previewRows.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-amber-800">
+              Vista previa de importación ({previewRows.length} filas)
+            </h2>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPreviewRows([])}
+                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImportConfirm}
+                disabled={importing}
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-60"
+              >
+                {importing ? "Importando..." : "Confirmar importación"}
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="text-left text-amber-900">
+                  {Object.keys(previewRows[0]).map((key) => (
+                    <th key={key} className="px-2 py-1 font-semibold">
+                      {key}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {previewRows.slice(0, 5).map((row, index) => (
+                  <tr key={index} className="border-t border-amber-200">
+                    {Object.keys(previewRows[0]).map((key) => (
+                      <td key={key} className="px-2 py-1 text-amber-900">
+                        {String(row[key] ?? "")}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (

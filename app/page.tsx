@@ -1,6 +1,8 @@
 export const instant = false;
 
 import StatCard from "@/components/StatCard";
+import LicenseGuard from "@/components/LicenseGuard";
+import LoansChart from "@/components/LoansChart";
 import { apiFetch } from "@/lib/api";
 
 type DashboardStats = {
@@ -30,7 +32,8 @@ export default async function Home() {
   const stats = await getStats();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <LicenseGuard>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-500">
@@ -134,9 +137,13 @@ export default async function Home() {
           Actividad reciente
         </h2>
         <p className="mt-2 text-sm text-slate-500">
-          Próximamente: listado de últimos préstamos y pagos.
+          Préstamos e ingresos de los últimos 6 meses.
         </p>
+        <div className="mt-4">
+          <LoansChart />
+        </div>
       </div>
     </div>
+    </LicenseGuard>
   );
 }

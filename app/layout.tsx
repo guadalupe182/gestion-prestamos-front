@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import { LicenseProvider } from "@/context/LicenseContext";
 import Navbar from "@/components/Navbar";
 import RouteGuard from "@/components/RouteGuard";
 import "./globals.css";
@@ -27,12 +28,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50 text-slate-900 flex flex-col">
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-1">
-            <RouteGuard>{children}</RouteGuard>
-          </main>
-        </AuthProvider>
+        <LicenseProvider>
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-1">
+              <RouteGuard>{children}</RouteGuard>
+            </main>
+          </AuthProvider>
+        </LicenseProvider>
       </body>
     </html>
   );
