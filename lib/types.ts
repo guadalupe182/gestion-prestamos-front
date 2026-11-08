@@ -78,6 +78,6 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   token: string;
-  type: string;
+  tokenType: string;
   expiresIn: number;
 }
