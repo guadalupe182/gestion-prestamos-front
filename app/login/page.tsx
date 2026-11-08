@@ -5,45 +5,70 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import type { AuthResponse, LoginRequest } from "@/lib/types";
+import type { AuthResponse } from "@/lib/types";
+
+const DEFAULT_LICENSE_KEY = "licencia-gdev";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [form, setForm] = useState<LoginRequest>({ username: "", password: "" });
+
+  const [isRegister, setIsRegister] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
-      const data = await apiFetch<AuthResponse>("/api/v1/auth/login", {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-      login(data.token, form.username);
-      router.replace("/");
+      if (isRegister) {
+        const username = name.trim() || email.trim();
+        const data = await apiFetch<AuthResponse>("/api/v1/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            username,
+            password,
+            licenseKey: DEFAULT_LICENSE_KEY,
+          }),
+        });
+        login(data.token, username);
+        setSuccess("Cuenta creada correctamente. Redirigiendo...");
+        router.replace("/");
+      } else {
+        const data = await apiFetch<AuthResponse>("/api/v1/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ username: email, password }),
+        });
+        login(data.token, email);
+        router.replace("/");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(
-          err.status === 401
-            ? "Credenciales inválidas"
-            : err.message || "Error al iniciar sesión",
-        );
+        setError(err.message || "Ocurrió un error. Intenta de nuevo.");
       } else {
-        setError("Error al iniciar sesión");
+        setError("Ocurrió un error. Intenta de nuevo.");
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const toggleMode = () => {
+    setIsRegister((prev) => !prev);
+    setError(null);
+    setSuccess(null);
+  };
+
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gray-50 px-4 py-8">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-xl transition-all duration-300">
         <div className="mb-8 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white shadow-md">
             P
@@ -52,17 +77,45 @@ export default function LoginPage() {
             Gestión de Préstamos
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Ingresa a tu cuenta para continuar
+            {isRegister
+              ? "Crea tu cuenta para continuar"
+              : "Ingresa a tu cuenta para continuar"}
           </p>
         </div>
 
         {error ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 transition-all">
             {error}
           </div>
         ) : null}
 
+        {success ? (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 transition-all">
+            {success}
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="space-y-5">
+          {isRegister ? (
+            <div className="transition-all duration-300">
+              <label
+                htmlFor="name"
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Nombre Completo
+              </label>
+              <input
+                id="name"
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                placeholder="Tu nombre completo"
+              />
+            </div>
+          ) : null}
+
           <div>
             <label
               htmlFor="email"
@@ -74,10 +127,8 @@ export default function LoginPage() {
               id="email"
               type="email"
               required
-              value={form.username}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, username: e.target.value }))
-              }
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               placeholder="usuario@empresa.com"
             />
@@ -95,10 +146,9 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
-                value={form.password}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, password: e.target.value }))
-                }
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-11 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 placeholder="••••••••"
               />
@@ -124,9 +174,26 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Ingresando..." : "Ingresar al Sistema"}
+            {loading
+              ? isRegister
+                ? "Registrando..."
+                : "Ingresando..."
+              : isRegister
+                ? "Crear Cuenta"
+                : "Ingresar al Sistema"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
+          {isRegister ? "¿Ya tienes una cuenta?" : "¿No tienes una cuenta?"}{" "}
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="font-medium text-blue-600 hover:underline"
+          >
+            {isRegister ? "Inicia sesión aquí" : "Regístrate aquí"}
+          </button>
+        </p>
       </div>
     </div>
   );

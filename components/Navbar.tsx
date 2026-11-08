@@ -14,6 +14,7 @@ const links = [
 export default function Navbar() {
   const pathname = usePathname();
   const { isAuthenticated, user, logout } = useAuth();
+  const hideLoginButton = pathname === "/login";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -61,7 +62,7 @@ export default function Navbar() {
                 Cerrar Sesión
               </button>
             </>
-          ) : (
+          ) : hideLoginButton ? null : (
             <Link
               href="/login"
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
